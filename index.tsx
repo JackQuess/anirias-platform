@@ -1,6 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+// DÜZELTME: Tailwind CSS'in çalışması için bu import şarttır!
+import './index.css'; 
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

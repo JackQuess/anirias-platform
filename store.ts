@@ -2,11 +2,11 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { UserProfile, WatchHistoryItem, AppLanguage, Anime, Episode, Notification, AccountDetails, SubscriptionPlan } from './types';
 import { INITIAL_PROFILES, MOCK_NOTIFICATIONS } from './constants';
-// @ts-ignore: Suppress implicit any error for this import
+// @ts-ignore: Suppress implicit any error for this import if types are missing
 import supabaseClientAny from './services/supabaseClient';
 import { Session, SupabaseClient, AuthChangeEvent } from '@supabase/supabase-js';
 
-// Client'ı güvenli bir şekilde tiple
+// Client'ı güvenli bir şekilde tiple (Implicit any hatasını çözer)
 const supabase = supabaseClientAny as unknown as SupabaseClient | null;
 
 interface AppState {
@@ -20,10 +20,14 @@ interface AppState {
   notifications: Notification[];
   searchQuery: string;
   
+  // Auth State
   session: Session | null;
   isAuthLoading: boolean;
+
+  // Account State
   account: AccountDetails;
 
+  // Actions
   initializeAuth: () => Promise<void>;
   signIn: (email: string, pass: string) => Promise<void>;
   signUp: (email: string, pass: string) => Promise<void>;
@@ -45,6 +49,7 @@ interface AppState {
   markAllNotificationsRead: () => void;
   setSearchQuery: (query: string) => void;
   
+  // Admin Actions
   addAnime: (anime: Omit<Anime, 'id' | 'episodes' | 'lastUpdated'>) => Promise<Anime>;
   updateAnime: (id: string, updatedAnime: Partial<Anime>) => Promise<void>;
   deleteAnime: (id: string) => Promise<void>;
@@ -52,10 +57,12 @@ interface AppState {
   updateEpisode: (animeId: string, episodeId: number, updatedEpisode: Partial<Episode>) => Promise<void>;
   deleteEpisode: (animeId: string, episodeId: number) => Promise<void>;
 
+  // Account Actions
   upgradeSubscription: (plan: SubscriptionPlan) => void;
   cancelSubscription: () => void;
   updateAccountSettings: (settings: Partial<AccountDetails>) => void;
 
+  // Selectors
   getHistory: () => Record<string, WatchHistoryItem>;
   getList: () => string[];
 }
@@ -77,6 +84,7 @@ export const useAppStore = create<AppState>()(
       isAuthLoading: true,
       
       account: {
+          id: 'acc_mock_1',
           email: "user@anirias.com",
           plan: "Free",
           nextBillingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString(),
@@ -84,6 +92,7 @@ export const useAppStore = create<AppState>()(
           memberSince: "2023"
       },
 
+      // --- AUTH ACTIONS ---
       initializeAuth: async () => {
           if (!supabase) {
              console.warn("Supabase client not initialized.");
@@ -120,6 +129,7 @@ export const useAppStore = create<AppState>()(
           set({ currentUser: null, session: null });
       },
 
+      // --- CONTENT ACTIONS (DATA MAPPING) ---
       fetchContent: async () => {
         if (!supabase) {
             set({ isContentLoading: false });
@@ -127,13 +137,15 @@ export const useAppStore = create<AppState>()(
         }
         set({ isContentLoading: true });
         try {
+            // DÜZELTME: İlişki hatasını (PGRST201) önlemek için foreign key adını açıkça belirtiyoruz.
             const { data, error } = await supabase
                 .from('animes')
-                .select(`*, episodes(*)`)
+                .select(`*, episodes!episodes_anime_id_fkey(*)`)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
             
+            // Backend (snake_case) -> Frontend (camelCase) Dönüşümü
             const mappedData = (data as any[]).map(anime => ({
                 ...anime,
                 heroImage: anime.hero_image || anime.heroImage, 
@@ -171,7 +183,7 @@ export const useAppStore = create<AppState>()(
             const newId = (Math.random() * 10000).toFixed(0);
             const newProfile: UserProfile = {
                 id: newId, name, isKid,
-                account_id: 'acc_1',
+                account_id: 'acc_1', // Mock account ID
                 avatar: `https://picsum.photos/seed/${newId}/200`,
                 language: 'Turkish', autoplayNext: true, autoplayPreviews: true
             };
@@ -257,6 +269,7 @@ export const useAppStore = create<AppState>()(
       addAnime: async (animeData) => {
         if (!supabase) throw new Error("Supabase client not available");
         
+        // Frontend -> DB Mapping
         const dbPayload = {
             title: animeData.title,
             description: animeData.description,
@@ -286,10 +299,12 @@ export const useAppStore = create<AppState>()(
         if (!supabase) throw new Error("Supabase client not available");
         
         const dbPayload: any = { ...updatedAnime };
+        // Map fields
         if (updatedAnime.heroImage) dbPayload.hero_image = updatedAnime.heroImage;
         if (updatedAnime.ageRating) dbPayload.age_rating = updatedAnime.ageRating;
         if (updatedAnime.jikanId) dbPayload.jikan_id = updatedAnime.jikanId;
         
+        // Cleanup frontend fields
         delete dbPayload.heroImage;
         delete dbPayload.ageRating;
         delete dbPayload.jikanId;
@@ -315,7 +330,8 @@ export const useAppStore = create<AppState>()(
         const episodesInput = Array.isArray(episodeData) ? episodeData : [episodeData];
         
         const dbPayloads = episodesInput.map(ep => {
-            // REST DEĞİŞKENİ KALDIRILDI (Fix for 'rest is unused')
+            // DÜZELTME: 'rest' değişkeni kaldırıldı ve sadece gerekli veriler eşlendi.
+            // Ayrıca episode_number, backend'de zorunlu olduğu için eklendi.
             return {
                 anime_id: animeId,
                 title: ep.title,
