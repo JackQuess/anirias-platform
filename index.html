@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Anirias - Anime Streaming</title>
     
+    <!-- Fontlar -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
     
     <style>
@@ -16,21 +17,17 @@
         overflow-x: hidden;
         margin: 0;
       }
-      /* Scrollbar Gizleme */
-      .no-scrollbar::-webkit-scrollbar {
-          display: none;
-      }
-      .no-scrollbar {
-          -ms-overflow-style: none;  /* IE and Edge */
-          scrollbar-width: none;  /* Firefox */
-      }
-      .accent-\[\#E50914\] {
-        accent-color: #E50914;
-      }
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      .accent-\[\#E50914\] { accent-color: #E50914; }
     </style>
   </head>
   <body>
     <div id="root"></div>
+    
+    <!-- KRİTİK DÜZELTME BURADA -->
+    <!-- Dosya adın index.tsx olduğu için burası da index.tsx OLMALI -->
     <script type="module" src="/src/index.tsx"></script>
+    
   </body>
 </html>
