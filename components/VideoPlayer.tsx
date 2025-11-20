@@ -51,7 +51,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ anime, episode, onClose, onNe
   // FIX: Get history for current user and then find saved progress for the anime
   const history = getHistory();
   const savedProgress = history[anime.id];
-  const initialTime = savedProgress && savedProgress.episodeId === episode.id ? savedProgress.timestamp : 0;
+  // Use episode.id safely with fallback
+  const currentEpisodeId = episode.id ?? 0;
+  const initialTime = savedProgress && savedProgress.episodeId === currentEpisodeId ? savedProgress.timestamp : 0;
 
   // Handle Source Error
   const handleVideoError = () => {
@@ -196,8 +198,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ anime, episode, onClose, onNe
       lastTapRef.current = now;
   };
   
-  // REMOVED: Unused handleCenterTap function
-
   const handleTimeUpdate = () => {
     if (videoRef.current) {
       const curr = videoRef.current.currentTime;
@@ -207,7 +207,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ anime, episode, onClose, onNe
 
       // Save progress every 5 seconds
       if (Math.floor(curr) % 5 === 0) {
-        updateProgress(anime.id, episode.id, curr, dur);
+        // Use safe ID fallback
+        updateProgress(anime.id, episode.id ?? 0, curr, dur);
       }
 
       // Skip Intro Logic
@@ -330,7 +331,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ anime, episode, onClose, onNe
               if(videoRef.current) {
                 const t = Number(e.target.value);
                 videoRef.current.currentTime = t;
-                updateProgress(anime.id, episode.id, t, duration);
+                // Use safe ID fallback
+                updateProgress(anime.id, episode.id ?? 0, t, duration);
               }
             }}
             className="absolute inset-0 w-full opacity-0 cursor-pointer"

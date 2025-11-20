@@ -106,19 +106,17 @@ export const fetchEpisodesFromJikan = async (
             
             if (data && data.data) {
                 const mapped = data.data.map((ep: any) => ({
-                    // KRİTİK DÜZELTME: id'yi kaldırdık! Supabase otomatik atayacak.
-                    // id: ep.mal_id, <-- ÖNCEKİ HATA BUYDU!
+                    // KRİTİK: id alanı YOK. Supabase otomatik atar.
                     title: ep.title || `Episode ${ep.mal_id}`,
-                    duration: ep.duration || 1440, // MAL'dan süre gelmiyorsa 24 dk
+                    duration: 1440, // Varsayılan süre
                     thumbnail: defaultImage,
-                    introStart: undefined, // Ekleme anında boş (null) gönderilmeli
+                    introStart: undefined,
                     introEnd: undefined,
                     outroStart: undefined,
                     releaseDate: ep.aired ? new Date(ep.aired).toISOString().split('T')[0] : undefined,
                     seasonNumber: seasonNum,
                     videoUrl: '', 
-                    // Jikan'dan gelen mal_id'yi bölüm numarası olarak kullanıyoruz:
-                    episodeNumber: ep.mal_id, 
+                    episodeNumber: ep.mal_id, // MAL ID'yi bölüm numarası olarak sakla
                 }));
                 allEpisodes = [...allEpisodes, ...mapped];
             }

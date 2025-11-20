@@ -3,7 +3,7 @@ import { useAppStore } from '../store';
 import { Anime, Episode, ContentType } from '../types';
 import { 
   X, Plus, Trash2, Layers, Pencil, Search, Download, 
-  Database, Loader2, CheckCircle2, MinusCircle, Upload, ListPlus, Image as ImageIcon,
+  Database, Loader2, CheckCircle2, MinusCircle, Upload, ListPlus, Image as ImageIcon, Film
 } from 'lucide-react';
 import { searchAnimeOnJikan, fetchEpisodesFromJikan } from '../services/jikanService';
 import { TRANSLATIONS } from '../constants';
@@ -166,9 +166,11 @@ const AdminPanel: React.FC = () => {
 
   const handleDeleteEpisode = async (episodeId: number) => {
       if (!selectedAnimeId || !window.confirm("Delete this episode?")) return;
-      setLoadingStates(prev => ({ ...prev, deleteEpisode: episodeId }));
+      // Use explicit fallback for potentially undefined episodeId
+      const safeId = episodeId ?? 0;
+      setLoadingStates(prev => ({ ...prev, deleteEpisode: safeId }));
       try {
-          await deleteEpisode(selectedAnimeId, episodeId);
+          await deleteEpisode(selectedAnimeId, safeId);
       } catch (e) {
           console.error(e);
           alert('Failed to delete episode.');
@@ -318,7 +320,13 @@ const AdminPanel: React.FC = () => {
                                                     <p className="font-bold truncate">{item.title}</p>
                                                     <div className="flex items-center gap-2 mt-1">
                                                         <span className="text-xs text-gray-400">Season:</span>
-                                                        <input type="number" value={item.targetSeason} onChange={e => setImportQueue(q => q.map(i => i.jikanId === item.jikanId ? {...i, targetSeason: Number(e.target.value)} : i))} className="w-16 bg-black border border-gray-600 rounded px-2 py-1 text-sm"/>
+                                                        {/* FIX: Ensure targetSeason is treated as number with fallback */}
+                                                        <input 
+                                                            type="number" 
+                                                            value={item.targetSeason || 1} 
+                                                            onChange={e => setImportQueue(q => q.map(i => i.jikanId === item.jikanId ? {...i, targetSeason: Number(e.target.value) || 1} : i))} 
+                                                            className="w-16 bg-black border border-gray-600 rounded px-2 py-1 text-sm"
+                                                        />
                                                     </div>
                                                 </div>
                                                 <button onClick={() => setImportQueue(q => q.filter(i => i.jikanId !== item.jikanId))} className="text-red-500"><MinusCircle size={16}/></button>
@@ -458,19 +466,16 @@ const AdminPanel: React.FC = () => {
                                         <label className="text-xs text-gray-500 block mb-1">Season</label>
                                         <input type="number" value={episodeForm.seasonNumber || 1} onChange={e => setEpisodeForm({...episodeForm, seasonNumber: Number(e.target.value)})} className="w-full bg-black border border-gray-700 rounded p-2"/>
                                       </div>
-                                      {/* --- DÜZELTİLEN KISIM --- */}
                                       <div>
                                         <label className="text-xs text-gray-500 block mb-1">Episode #</label>
                                         <input 
                                             type="number" 
-                                            // id yerine episodeNumber'a bağladık
                                             value={episodeForm.episodeNumber || ''} 
                                             onChange={e => setEpisodeForm({...episodeForm, episodeNumber: parseInt(e.target.value)})} 
                                             placeholder="1"
                                             className="w-full bg-black border border-gray-700 rounded p-2"
                                         />
                                       </div>
-                                      {/* ----------------------- */}
                                     </div>
                                 </div>
                                 <button onClick={handleSaveEpisode} disabled={loadingStates.saveEpisode} className="w-full bg-white text-black font-bold py-3 rounded mt-4 flex items-center justify-center gap-2 hover:bg-gray-200">
@@ -489,13 +494,14 @@ const AdminPanel: React.FC = () => {
                                             {(eps as Episode[]).map(ep => (
                                                 <div key={ep.id} className="flex items-center justify-between p-3 bg-[#252525] hover:bg-[#2a2a2a] rounded border border-transparent hover:border-gray-600 group">
                                                     <div className="flex items-center gap-3 overflow-hidden">
-                                                        <span className="text-[#E50914] font-mono text-xs w-6">#{ep.episodeNumber}</span>
+                                                        {/* Use optional chaining or fallback for ep.episodeNumber */}
+                                                        <span className="text-[#E50914] font-mono text-xs w-6">#{ep.episodeNumber ?? '?'}</span>
                                                         <span className="text-sm truncate font-medium">{ep.title}</span>
                                                         {!ep.videoUrl && <span className="text-[10px] bg-red-900/50 text-red-400 px-1 rounded">No Video</span>}
                                                     </div>
                                                     <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <button onClick={() => { setEpisodeForm(ep); setEditingEpisodeId(ep.id); }} className="p-1 text-blue-400 hover:bg-blue-900/30 rounded"><Pencil size={14} /></button>
-                                                        <button onClick={() => handleDeleteEpisode(ep.id)} disabled={loadingStates.deleteEpisode === ep.id} className="p-1 text-red-400 hover:bg-red-900/30 rounded">
+                                                        <button onClick={() => { setEpisodeForm(ep); setEditingEpisodeId(ep.id ?? null); }} className="p-1 text-blue-400 hover:bg-blue-900/30 rounded"><Pencil size={14} /></button>
+                                                        <button onClick={() => handleDeleteEpisode(ep.id ?? 0)} disabled={loadingStates.deleteEpisode === ep.id} className="p-1 text-red-400 hover:bg-red-900/30 rounded">
                                                             {loadingStates.deleteEpisode === ep.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
                                                         </button>
                                                     </div>
