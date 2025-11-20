@@ -72,6 +72,7 @@ export interface AccountDetails {
 export interface UserProfile {
   id: string;
   name: string;
+  account_id?: string;
   avatar: string;
   isKid: boolean;
   language?: string;

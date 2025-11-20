@@ -3,7 +3,7 @@ import { useAppStore } from '../store';
 import { Anime, Episode, ContentType } from '../types';
 import { 
   X, Plus, Trash2, Layers, Pencil, Search, Download, 
-  Database, Loader2, CheckCircle2, MinusCircle, Upload, ListPlus, Image as ImageIcon, Film
+  Database, Loader2, CheckCircle2, MinusCircle, Upload, ListPlus, Image as ImageIcon,
 } from 'lucide-react';
 import { searchAnimeOnJikan, fetchEpisodesFromJikan } from '../services/jikanService';
 import { TRANSLATIONS } from '../constants';

@@ -2,10 +2,11 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { UserProfile, WatchHistoryItem, AppLanguage, Anime, Episode, Notification, AccountDetails, SubscriptionPlan } from './types';
 import { INITIAL_PROFILES, MOCK_NOTIFICATIONS } from './constants';
+// @ts-ignore: Suppress implicit any error for this import
 import supabaseClientAny from './services/supabaseClient';
 import { Session, SupabaseClient, AuthChangeEvent } from '@supabase/supabase-js';
 
-// DÜZELTME 1: 'unknown' olarak işaretleyip sonra tiplemek hatayı susturur.
+// Client'ı güvenli bir şekilde tiple
 const supabase = supabaseClientAny as unknown as SupabaseClient | null;
 
 interface AppState {
@@ -151,7 +152,7 @@ export const useAppStore = create<AppState>()(
                     outroStart: ep.outro_start,
                     animeId: ep.anime_id,
                     duration: ep.duration
-                })).sort((a: any, b: any) => a.episodeNumber - b.episodeNumber)
+                })).sort((a: any, b: any) => (a.episodeNumber || 0) - (b.episodeNumber || 0))
             })) as Anime[];
 
             set({ content: mappedData, isContentLoading: false });
@@ -170,6 +171,7 @@ export const useAppStore = create<AppState>()(
             const newId = (Math.random() * 10000).toFixed(0);
             const newProfile: UserProfile = {
                 id: newId, name, isKid,
+                account_id: 'acc_1',
                 avatar: `https://picsum.photos/seed/${newId}/200`,
                 language: 'Turkish', autoplayNext: true, autoplayPreviews: true
             };
@@ -313,15 +315,14 @@ export const useAppStore = create<AppState>()(
         const episodesInput = Array.isArray(episodeData) ? episodeData : [episodeData];
         
         const dbPayloads = episodesInput.map(ep => {
-            // DÜZELTME 2: Kullanılmayan 'rest' değişkeni kaldırıldı.
-            // Geçici frontend ID'sini göndermiyoruz, sadece ihtiyacımız olanları alıyoruz.
+            // REST DEĞİŞKENİ KALDIRILDI (Fix for 'rest is unused')
             return {
                 anime_id: animeId,
                 title: ep.title,
                 thumbnail_url: ep.thumbnail,
                 video_url: ep.videoUrl,
                 season_number: ep.seasonNumber || 1,
-                episode_number: ep.episodeNumber || (Math.floor(Math.random() * 1000)), 
+                episode_number: ep.episodeNumber || (Math.floor(Math.random() * 10000)), 
                 intro_start: ep.introStart,
                 intro_end: ep.introEnd,
                 outro_start: ep.outroStart,

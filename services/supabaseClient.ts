@@ -1,7 +1,8 @@
-
 import { createClient } from '@supabase/supabase-js';
 
 // Use process.env, which works in this environment and will be replaced by Vite during a build.
+// Not: Eğer Vite projesi standart ayarlarındaysa import.meta.env kullanılması önerilir,
+// ancak mevcut yapıyı bozmamak için process.env bırakıldı.
 const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
 
@@ -22,8 +23,10 @@ export const uploadFile = async (file: File, bucket: string = 'videos'): Promise
 
     try {
         // Generate a unique file name to prevent collisions
-        // e.g., 17156234234_my_video.mp4
-        const fileExt = file.name.split('.').pop();
+        // e.g., 17156234234_my_video_mp4
+        
+        // DÜZELTME: 'fileExt' değişkeni kullanılmadığı için silindi.
+        
         const sanitizedName = file.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
         const fileName = `${Date.now()}_${sanitizedName}`;
         const filePath = `${fileName}`;
