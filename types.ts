@@ -68,6 +68,7 @@ export interface AccountDetails {
   nextBillingDate: string;
   cardLast4: string;
   memberSince: string;
+  role?: string; // admin, user, etc.
 }
 
 export interface UserProfile {
