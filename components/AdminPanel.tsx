@@ -3,7 +3,7 @@ import { useAppStore } from '../store';
 import { Anime, Episode, ContentType } from '../types';
 import { 
   X, Plus, Trash2, Layers, Pencil, Search, Download, 
-  Database, Loader2, CheckCircle2, MinusCircle, Upload, ListPlus, Image as ImageIcon, Film
+  Database, Loader2, CheckCircle2, MinusCircle, Upload, ListPlus, Image as ImageIcon
 } from 'lucide-react';
 import { searchAnimeOnJikan, fetchEpisodesFromJikan } from '../services/jikanService';
 import { TRANSLATIONS } from '../constants';
@@ -166,7 +166,7 @@ const AdminPanel: React.FC = () => {
 
   const handleDeleteEpisode = async (episodeId: number) => {
       if (!selectedAnimeId || !window.confirm("Delete this episode?")) return;
-      // Use explicit fallback for potentially undefined episodeId
+      // DÜZELTME: episodeId undefined ise 0 kullan
       const safeId = episodeId ?? 0;
       setLoadingStates(prev => ({ ...prev, deleteEpisode: safeId }));
       try {
@@ -320,7 +320,6 @@ const AdminPanel: React.FC = () => {
                                                     <p className="font-bold truncate">{item.title}</p>
                                                     <div className="flex items-center gap-2 mt-1">
                                                         <span className="text-xs text-gray-400">Season:</span>
-                                                        {/* FIX: Ensure targetSeason is treated as number with fallback */}
                                                         <input 
                                                             type="number" 
                                                             value={item.targetSeason || 1} 
@@ -494,13 +493,15 @@ const AdminPanel: React.FC = () => {
                                             {(eps as Episode[]).map(ep => (
                                                 <div key={ep.id} className="flex items-center justify-between p-3 bg-[#252525] hover:bg-[#2a2a2a] rounded border border-transparent hover:border-gray-600 group">
                                                     <div className="flex items-center gap-3 overflow-hidden">
-                                                        {/* Use optional chaining or fallback for ep.episodeNumber */}
+                                                        {/* DÜZELTME: null fallback ekledik */}
                                                         <span className="text-[#E50914] font-mono text-xs w-6">#{ep.episodeNumber ?? '?'}</span>
                                                         <span className="text-sm truncate font-medium">{ep.title}</span>
                                                         {!ep.videoUrl && <span className="text-[10px] bg-red-900/50 text-red-400 px-1 rounded">No Video</span>}
                                                     </div>
                                                     <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        {/* DÜZELTME: null fallback ekledik */}
                                                         <button onClick={() => { setEpisodeForm(ep); setEditingEpisodeId(ep.id ?? null); }} className="p-1 text-blue-400 hover:bg-blue-900/30 rounded"><Pencil size={14} /></button>
+                                                        {/* DÜZELTME: undefined fallback ekledik (0) */}
                                                         <button onClick={() => handleDeleteEpisode(ep.id ?? 0)} disabled={loadingStates.deleteEpisode === ep.id} className="p-1 text-red-400 hover:bg-red-900/30 rounded">
                                                             {loadingStates.deleteEpisode === ep.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
                                                         </button>

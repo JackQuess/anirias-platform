@@ -136,6 +136,7 @@ export const useAppStore = create<AppState>()(
         }
         set({ isContentLoading: true });
         try {
+            // İlişki hatasını (PGRST201) önlemek için foreign key adını açıkça belirtiyoruz.
             const { data, error } = await supabase
                 .from('animes')
                 .select(`*, episodes!episodes_anime_id_fkey(*)`)
@@ -181,7 +182,7 @@ export const useAppStore = create<AppState>()(
             const newId = (Math.random() * 10000).toFixed(0);
             const newProfile: UserProfile = {
                 id: newId, name, isKid,
-                account_id: 'acc_1',
+                account_id: 'acc_1', // Mock account ID
                 avatar: `https://picsum.photos/seed/${newId}/200`,
                 language: 'Turkish', autoplayNext: true, autoplayPreviews: true
             };
@@ -325,24 +326,30 @@ export const useAppStore = create<AppState>()(
         const episodesInput = Array.isArray(episodeData) ? episodeData : [episodeData];
         
         const dbPayloads = episodesInput.map(ep => {
-            // Geçici ID'yi yoksayıyoruz
+            // Geçici ID'yi yoksay, Supabase atayacak
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
             const { id, ...rest } = ep;
 
-            // KRİTİK DÜZELTME: Veritabanına gidecek payload hazırlanıyor
-            return {
+            // KRİTİK DÜZELTME: Sadece tanımlı değerleri gönder, null/undefined ise gönderme
+            // Bu, Supabase'in INT4 alanlara boş string gitmesini engeller.
+            const payload: Record<string, any> = {
                 anime_id: animeId,
-                title: ep.title,
-                thumbnail_url: ep.thumbnail,
-                video_url: ep.videoUrl,
-                season_number: ep.seasonNumber || 1,
-                // Episode Number zorunlu olduğu için rasgele sayı atıyoruz
-                episode_number: ep.episodeNumber || (Math.floor(Math.random() * 10000)), 
-                intro_start: ep.introStart,
-                intro_end: ep.introEnd,
-                outro_start: ep.outroStart,
-                duration: ep.duration
+                title: ep.title || `Episode ${ep.episodeNumber || 'Unknown'}`, // Başlık yoksa varsayılan oluştur
+                // DÜZELTME: Sayısal alanları güvenli bir şekilde tam sayıya çevir
+                episode_number: ep.episodeNumber ? parseInt(String(ep.episodeNumber), 10) : (Math.floor(Math.random() * 10000)),
+                season_number: ep.seasonNumber ? parseInt(String(ep.seasonNumber), 10) : 1,
             };
+
+            if (ep.thumbnail) payload.thumbnail_url = ep.thumbnail;
+            if (ep.videoUrl) payload.video_url = ep.videoUrl;
+            
+            // Sayısal alanlar için ek kontroller:
+            if (ep.duration !== undefined && ep.duration !== null) payload.duration = parseInt(String(ep.duration), 10);
+            if (ep.introStart !== undefined && ep.introStart !== null) payload.intro_start = parseInt(String(ep.introStart), 10);
+            if (ep.introEnd !== undefined && ep.introEnd !== null) payload.intro_end = parseInt(String(ep.introEnd), 10);
+            if (ep.outroStart !== undefined && ep.outroStart !== null) payload.outro_start = parseInt(String(ep.outroStart), 10);
+
+            return payload;
         });
 
         // Veritabanına yaz ve eklenen kayıtları (gerçek ID ile) geri çek
@@ -357,7 +364,6 @@ export const useAppStore = create<AppState>()(
         set(state => ({
           content: state.content.map(a => a.id === animeId ? { 
               ...a, 
-              // newEpisodes artık gerçek DB ID'lerini içerir.
               episodes: [...a.episodes, ...(newEpisodes as Episode[])], 
               lastUpdated: Date.now() 
           } : a)
