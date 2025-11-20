@@ -1,4 +1,3 @@
-
 import { Anime, ContentType, AnimeStatus, Episode } from '../types';
 
 const JIKAN_API_URL = 'https://api.jikan.moe/v4';
@@ -107,15 +106,19 @@ export const fetchEpisodesFromJikan = async (
             
             if (data && data.data) {
                 const mapped = data.data.map((ep: any) => ({
-                    id: ep.mal_id,
+                    // KRİTİK DÜZELTME: id'yi kaldırdık! Supabase otomatik atayacak.
+                    // id: ep.mal_id, <-- ÖNCEKİ HATA BUYDU!
                     title: ep.title || `Episode ${ep.mal_id}`,
-                    duration: 1440,
+                    duration: ep.duration || 1440, // MAL'dan süre gelmiyorsa 24 dk
                     thumbnail: defaultImage,
-                    introStart: 0,
-                    introEnd: 0,
-                    releaseDate: ep.aired ? new Date(ep.aired).toISOString().split('T')[0] : '',
+                    introStart: undefined, // Ekleme anında boş (null) gönderilmeli
+                    introEnd: undefined,
+                    outroStart: undefined,
+                    releaseDate: ep.aired ? new Date(ep.aired).toISOString().split('T')[0] : undefined,
                     seasonNumber: seasonNum,
-                    videoUrl: '' 
+                    videoUrl: '', 
+                    // Jikan'dan gelen mal_id'yi bölüm numarası olarak kullanıyoruz:
+                    episodeNumber: ep.mal_id, 
                 }));
                 allEpisodes = [...allEpisodes, ...mapped];
             }
@@ -126,7 +129,7 @@ export const fetchEpisodesFromJikan = async (
         }
         return allEpisodes;
     } catch (e) {
-        console.error(e);
+        console.error("Batch Import Failed during API fetch:", e);
         return [];
     }
 };

@@ -128,6 +128,7 @@ export const useAppStore = create<AppState>()(
           set({ currentUser: null, session: null });
       },
 
+      // --- CONTENT ACTIONS (DATA MAPPING) ---
       fetchContent: async () => {
         if (!supabase) {
             set({ isContentLoading: false });
@@ -344,17 +345,20 @@ export const useAppStore = create<AppState>()(
             };
         });
 
-        const { error } = await supabase.from('episodes').insert(dbPayloads);
+        // KRİTİK DÜZELTME: Veritabanına yaz ve eklenen kayıtları geri çek (gerçek ID'leri almak için)
+        const { data: newEpisodes, error } = await supabase.from('episodes').insert(dbPayloads).select();
         
         if (error) {
             console.error("Supabase Insert Error:", error);
             throw error;
         }
 
+        // Optimistic Update: Yeni gelen gerçek ID'li veriyi state'e ekle
         set(state => ({
           content: state.content.map(a => a.id === animeId ? { 
               ...a, 
-              episodes: [...a.episodes, ...(Array.isArray(episodeData) ? episodeData : [episodeData])], 
+              // newEpisodes artık gerçek DB ID'lerini içerir.
+              episodes: [...a.episodes, ...(newEpisodes as Episode[])], 
               lastUpdated: Date.now() 
           } : a)
         }));
