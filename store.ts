@@ -4,10 +4,11 @@ import { UserProfile, WatchHistoryItem, AppLanguage, Anime, Episode, Notificatio
 import { INITIAL_PROFILES, MOCK_NOTIFICATIONS } from './constants';
 // @ts-ignore: Suppress implicit any error for this import if types are missing
 import supabaseClientAny from './services/supabaseClient';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { Session, SupabaseClient, AuthChangeEvent } from '@supabase/supabase-js';
 
 // Client'ı güvenli bir şekilde tiple
-const supabase = supabaseClientAny as unknown as SupabaseClient | null;
+const supabase = (supabaseClientAny as SupabaseClient) || null;
 
 interface AppState {
   appLanguage: AppLanguage;
@@ -75,7 +76,7 @@ export const useAppStore = create<AppState>()(
       currentUser: null,
       watchHistory: {},
       myList: {},
-      content: [],
+      content: [] as Anime[],
       isContentLoading: true,
       notifications: MOCK_NOTIFICATIONS,
       searchQuery: '',
@@ -333,22 +334,22 @@ export const useAppStore = create<AppState>()(
         const dbPayloads = episodesInput.map(ep => {
             // Geçici ID'yi yoksay, Supabase atayacak
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            const { id, ...rest } = ep;
+            const { id: _id, ...epSafe } = ep;
 
             const payload: Record<string, any> = {
                 anime_id: animeId,
-                title: ep.title || `Episode ${ep.episodeNumber || 'Unknown'}`,
-                episode_number: clean(parseInt(String(ep.episodeNumber), 10)),
-                season_number: clean(parseInt(String(ep.seasonNumber), 10)),
+                title: epSafe.title || `Episode ${epSafe.episodeNumber || 'Unknown'}`,
+                episode_number: clean(parseInt(String(epSafe.episodeNumber), 10)),
+                season_number: clean(parseInt(String(epSafe.seasonNumber), 10)),
             };
 
-            if (clean(ep.thumbnail) !== undefined) payload.thumbnail_url = ep.thumbnail;
-            if (clean(ep.videoUrl) !== undefined) payload.video_url = ep.videoUrl;
+            if (clean(epSafe.thumbnail) !== undefined) payload.thumbnail_url = epSafe.thumbnail;
+            if (clean(epSafe.videoUrl) !== undefined) payload.video_url = epSafe.videoUrl;
 
-            if (clean(ep.duration) !== undefined) payload.duration = clean(parseInt(String(ep.duration), 10));
-            if (clean(ep.introStart) !== undefined) payload.intro_start = clean(parseInt(String(ep.introStart), 10));
-            if (clean(ep.introEnd) !== undefined) payload.intro_end = clean(parseInt(String(ep.introEnd), 10));
-            if (clean(ep.outroStart) !== undefined) payload.outro_start = clean(parseInt(String(ep.outroStart), 10));
+            if (clean(epSafe.duration) !== undefined) payload.duration = clean(parseInt(String(epSafe.duration), 10));
+            if (clean(epSafe.introStart) !== undefined) payload.intro_start = clean(parseInt(String(epSafe.introStart), 10));
+            if (clean(epSafe.introEnd) !== undefined) payload.intro_end = clean(parseInt(String(epSafe.introEnd), 10));
+            if (clean(epSafe.outroStart) !== undefined) payload.outro_start = clean(parseInt(String(epSafe.outroStart), 10));
 
             return payload;
         });
@@ -365,7 +366,7 @@ export const useAppStore = create<AppState>()(
         set(state => ({
           content: state.content.map(a => a.id === animeId ? { 
               ...a, 
-              episodes: [...a.episodes, ...(newEpisodes as Episode[])], 
+              episodes: [...a.episodes, ...((newEpisodes ?? []) as Episode[])], 
               lastUpdated: Date.now() 
           } : a)
         }));
