@@ -5,12 +5,10 @@ import { INITIAL_PROFILES, MOCK_NOTIFICATIONS } from './constants';
 import supabaseClientAny from './services/supabaseClient';
 import { Session, SupabaseClient, AuthChangeEvent } from '@supabase/supabase-js';
 
-// DÜZELTME 1: Değişkeni 'any' olarak cast edip sonra SupabaseClient olarak tipliyoruz.
-// Bu, "implicit any" hatasını susturur.
+// DÜZELTME 1: 'unknown' olarak işaretleyip sonra tiplemek hatayı susturur.
 const supabase = supabaseClientAny as unknown as SupabaseClient | null;
 
 interface AppState {
-  // ... (Interface aynı kalıyor)
   appLanguage: AppLanguage;
   profiles: UserProfile[];
   currentUser: UserProfile | null;
@@ -20,6 +18,7 @@ interface AppState {
   isContentLoading: boolean;
   notifications: Notification[];
   searchQuery: string;
+  
   session: Session | null;
   isAuthLoading: boolean;
   account: AccountDetails;
@@ -28,6 +27,7 @@ interface AppState {
   signIn: (email: string, pass: string) => Promise<void>;
   signUp: (email: string, pass: string) => Promise<void>;
   signOut: () => Promise<void>;
+
   fetchContent: () => Promise<void>;
   setAppLanguage: (lang: AppLanguage) => void;
   setCurrentUser: (user: UserProfile | null) => void;
@@ -71,8 +71,10 @@ export const useAppStore = create<AppState>()(
       isContentLoading: true,
       notifications: MOCK_NOTIFICATIONS,
       searchQuery: '',
+      
       session: null,
       isAuthLoading: true,
+      
       account: {
           email: "user@anirias.com",
           plan: "Free",
@@ -87,6 +89,7 @@ export const useAppStore = create<AppState>()(
              set({ isAuthLoading: false });
              return;
           }
+          
           const { data: { session } } = await supabase.auth.getSession();
           set({ session, isAuthLoading: false });
 
@@ -134,6 +137,7 @@ export const useAppStore = create<AppState>()(
                 ...anime,
                 heroImage: anime.hero_image || anime.heroImage, 
                 ageRating: anime.age_rating || anime.ageRating,
+                jikanId: anime.jikan_id,
                 episodes: (anime.episodes || []).map((ep: any) => ({
                     id: ep.id,
                     title: ep.title,
@@ -145,8 +149,9 @@ export const useAppStore = create<AppState>()(
                     introStart: ep.intro_start,
                     introEnd: ep.intro_end,
                     outroStart: ep.outro_start,
-                    animeId: ep.anime_id
-                })).sort((a: any, b: any) => a.id - b.id)
+                    animeId: ep.anime_id,
+                    duration: ep.duration
+                })).sort((a: any, b: any) => a.episodeNumber - b.episodeNumber)
             })) as Anime[];
 
             set({ content: mappedData, isContentLoading: false });
@@ -245,7 +250,7 @@ export const useAppStore = create<AppState>()(
       markNotificationRead: (id) => set((state) => ({ notifications: state.notifications.map(n => n.id === id ? {...n, read: true} : n) })),
       markAllNotificationsRead: () => set((state) => ({ notifications: state.notifications.map(n => ({...n, read: true})) })),
       
-      // --- ADMIN ACTIONS ---
+      // --- ADMIN ACTIONS WITH SUPABASE ---
 
       addAnime: async (animeData) => {
         if (!supabase) throw new Error("Supabase client not available");
@@ -259,7 +264,8 @@ export const useAppStore = create<AppState>()(
             age_rating: animeData.ageRating,
             tags: animeData.tags,
             type: animeData.type,
-            status: animeData.status
+            status: animeData.status,
+            jikan_id: animeData.jikanId
         };
 
         const { data, error } = await supabase.from('animes').insert([dbPayload]).select().single();
@@ -280,8 +286,11 @@ export const useAppStore = create<AppState>()(
         const dbPayload: any = { ...updatedAnime };
         if (updatedAnime.heroImage) dbPayload.hero_image = updatedAnime.heroImage;
         if (updatedAnime.ageRating) dbPayload.age_rating = updatedAnime.ageRating;
+        if (updatedAnime.jikanId) dbPayload.jikan_id = updatedAnime.jikanId;
+        
         delete dbPayload.heroImage;
         delete dbPayload.ageRating;
+        delete dbPayload.jikanId;
 
         const { error } = await supabase.from('animes').update(dbPayload).eq('id', id);
         if (error) throw error;
@@ -303,18 +312,20 @@ export const useAppStore = create<AppState>()(
 
         const episodesInput = Array.isArray(episodeData) ? episodeData : [episodeData];
         
-        // DÜZELTME 2: 'rest' hatasını gidermek için kullanılmayan değişkeni sildik.
-        // Artık direkt 'ep' üzerinden eşleme yapıyoruz.
         const dbPayloads = episodesInput.map(ep => {
+            // DÜZELTME 2: Kullanılmayan 'rest' değişkeni kaldırıldı.
+            // Geçici frontend ID'sini göndermiyoruz, sadece ihtiyacımız olanları alıyoruz.
             return {
                 anime_id: animeId,
                 title: ep.title,
                 thumbnail_url: ep.thumbnail,
                 video_url: ep.videoUrl,
-                season_number: ep.seasonNumber,
+                season_number: ep.seasonNumber || 1,
+                episode_number: ep.episodeNumber || (Math.floor(Math.random() * 1000)), 
                 intro_start: ep.introStart,
                 intro_end: ep.introEnd,
-                outro_start: ep.outroStart // types.ts güncellendiyse bu hata vermeyecek
+                outro_start: ep.outroStart,
+                duration: ep.duration
             };
         });
 
@@ -342,10 +353,11 @@ export const useAppStore = create<AppState>()(
         if (updatedEpisode.thumbnail) dbPayload.thumbnail_url = updatedEpisode.thumbnail;
         if (updatedEpisode.videoUrl) dbPayload.video_url = updatedEpisode.videoUrl;
         if (updatedEpisode.seasonNumber) dbPayload.season_number = updatedEpisode.seasonNumber;
+        if (updatedEpisode.episodeNumber) dbPayload.episode_number = updatedEpisode.episodeNumber;
         if (updatedEpisode.introStart !== undefined) dbPayload.intro_start = updatedEpisode.introStart;
         if (updatedEpisode.introEnd !== undefined) dbPayload.intro_end = updatedEpisode.introEnd;
-        // types.ts güncellendiyse bu hata vermeyecek
         if (updatedEpisode.outroStart !== undefined) dbPayload.outro_start = updatedEpisode.outroStart;
+        if (updatedEpisode.duration !== undefined) dbPayload.duration = updatedEpisode.duration;
 
         const { error } = await supabase.from('episodes').update(dbPayload).eq('id', episodeId);
         

@@ -3,11 +3,10 @@ import { useAppStore } from '../store';
 import { Anime, Episode, ContentType } from '../types';
 import { 
   X, Plus, Trash2, Layers, Pencil, Search, Download, 
-  Database, Loader2, CheckCircle2, MinusCircle, Upload, ListPlus 
+  Database, Loader2, CheckCircle2, MinusCircle, Upload, ListPlus, Image as ImageIcon, Film
 } from 'lucide-react';
 import { searchAnimeOnJikan, fetchEpisodesFromJikan } from '../services/jikanService';
 import { TRANSLATIONS } from '../constants';
-// Supabase Upload Fonksiyonunu Import Et
 import { uploadFile } from '../services/supabaseClient';
 
 const AdminPanel: React.FC = () => {
@@ -25,7 +24,7 @@ const AdminPanel: React.FC = () => {
     deleteEpisode: null as number | null,
     importing: false,
     fetchingRelations: false,
-    uploading: false // Video yükleme durumu
+    uploading: false
   });
 
   // --- Import Modal State ---
@@ -43,7 +42,6 @@ const AdminPanel: React.FC = () => {
   const [editingEpisodeId, setEditingEpisodeId] = useState<number | null>(null);
   const [episodeForm, setEpisodeForm] = useState<Partial<Episode>>({});
   
-  // Gizli dosya inputu için referans
   const fileInputRef = useRef<HTMLInputElement>(null); 
   
   // --- Memos & Derived State ---
@@ -63,14 +61,12 @@ const AdminPanel: React.FC = () => {
           if (!groups[season]) groups[season] = [];
           groups[season].push(ep);
       });
-      // Sezon içindeki bölümleri sırala
       for (const season in groups) {
-          groups[season].sort((a, b) => a.id - b.id);
+          groups[season].sort((a, b) => (a.episodeNumber || 0) - (b.episodeNumber || 0));
       }
       return groups;
   }, [selectedAnime]);
 
-  // Seçili anime silinirse paneli temizle
   useEffect(() => {
       if (selectedAnimeId && !content.some(a => a.id === selectedAnimeId)) {
           setRightPanelView('empty');
@@ -82,7 +78,6 @@ const AdminPanel: React.FC = () => {
   const handleSelectAnime = (anime: Anime) => {
     setSelectedAnimeId(anime.id);
     setRightPanelView('manage_episodes');
-    // Formları sıfırla
     setEpisodeForm({});
     setEditingEpisodeId(null);
   };
@@ -119,17 +114,17 @@ const AdminPanel: React.FC = () => {
           const processedTags = tagInput.split(',').map(t => t.trim()).filter(Boolean);
           const finalData = { ...animeForm, tags: processedTags };
           
-          if (selectedAnimeId) { // Update
+          if (selectedAnimeId) { 
               await updateAnime(selectedAnimeId, finalData);
               setRightPanelView('manage_episodes');
-          } else { // Create
+          } else { 
               const newAnime = await addAnime(finalData as any);
               setSelectedAnimeId(newAnime.id);
               setRightPanelView('manage_episodes');
           }
       } catch (e) {
           console.error("Save Anime Error:", e);
-          alert('Failed to save anime. Check console for details.');
+          alert('Failed to save anime.');
       } finally {
           setLoadingStates(prev => ({...prev, saveAnime: false}));
       }
@@ -156,16 +151,14 @@ const AdminPanel: React.FC = () => {
           if (editingEpisodeId) {
               await updateEpisode(selectedAnimeId, editingEpisodeId, episodeForm);
           } else {
-              // Yeni eklerken geçici bir ID veriyoruz (Backend düzeltecek)
               const newEp = { ...episodeForm as Omit<Episode, 'id'>, id: Date.now() };
               await addEpisode(selectedAnimeId, newEp as Episode);
           }
-          // Başarılı olunca formu temizle
           setEpisodeForm({});
           setEditingEpisodeId(null);
       } catch (e) {
           console.error("Save Episode Error:", e);
-          alert('Failed to save episode. Please try again.');
+          alert('Failed to save episode. Check console for details.');
       } finally {
           setLoadingStates(prev => ({...prev, saveEpisode: false}));
       }
@@ -184,37 +177,29 @@ const AdminPanel: React.FC = () => {
       }
   };
 
-  // --- File Upload Handler ---
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Dosya boyutu kontrolü (Opsiyonel: 500MB limit)
-    // if (file.size > 500 * 1024 * 1024) { alert("File too large!"); return; }
-
     setLoadingStates(prev => ({ ...prev, uploading: true }));
 
     try {
-        // Supabase Storage 'videos' bucket'ına yükle
         const publicUrl = await uploadFile(file, 'videos'); 
-        
         if (publicUrl) {
-            // Formdaki video URL alanını güncelle
             setEpisodeForm(prev => ({ ...prev, videoUrl: publicUrl }));
         } else {
-            alert("Upload failed. Please check your Supabase Storage settings.");
+            alert("Upload failed. Check console.");
         }
     } catch (error) {
         console.error("Upload Error:", error);
-        alert("An unexpected error occurred during upload.");
+        alert("An error occurred during upload.");
     } finally {
         setLoadingStates(prev => ({ ...prev, uploading: false }));
-        // Input değerini sıfırla (aynı dosyayı tekrar seçebilmek için)
         if(fileInputRef.current) fileInputRef.current.value = '';
     }
   };
   
-  // --- Import Handlers (Jikan API) ---
+  // --- Import Handlers ---
   const openImportModal = (mode: 'metadata' | 'episodes') => {
       if (mode === 'episodes' && !selectedAnime) return;
       setImportMode(mode);
@@ -235,7 +220,6 @@ const AdminPanel: React.FC = () => {
         setImportStep('results');
     } catch (error) {
         console.error("Search Error:", error);
-        alert("Failed to search. Please try again.");
     } finally {
         setLoadingStates(p => ({...p, importing: false}));
     }
@@ -260,18 +244,18 @@ const AdminPanel: React.FC = () => {
       try {
           const queue = [...importQueue].sort((a, b) => a.targetSeason - b.targetSeason);
           for (const item of queue) {
-              setImportStatus(`Fetching episodes for "${item.title}" (Season ${item.targetSeason})...`);
+              setImportStatus(`Fetching: ${item.title} (S${item.targetSeason})...`);
               const episodes = await fetchEpisodesFromJikan(item.jikanId, item.targetSeason, selectedAnime.thumbnail || item.thumbnail, setImportStatus);
               if (episodes.length > 0) {
                   const taggedEpisodes = episodes.map(ep => ({ ...ep, seasonNumber: item.targetSeason }));
                   await addEpisode(selectedAnimeId, taggedEpisodes);
               }
-              await new Promise(r => setTimeout(r, 800)); // Rate limit buffer
+              await new Promise(r => setTimeout(r, 1500)); 
           }
           alert(`Batch Import Complete!`);
       } catch (e) {
           console.error(e);
-          alert('Batch import failed.');
+          alert('Batch import failed. Check console.');
       } finally {
           setShowImportModal(false);
           setLoadingStates(p => ({...p, importing: false}));
@@ -295,19 +279,8 @@ const AdminPanel: React.FC = () => {
 
                     {importStep === 'search' && (
                         <div className="p-8 flex-1 flex flex-col items-center justify-center">
-                            <input 
-                                type="text" 
-                                value={importQuery} 
-                                onChange={e => setImportQuery(e.target.value)} 
-                                onKeyDown={e => e.key === 'Enter' && handleImportSearch()} 
-                                placeholder={t.adminSearchPlaceholder} 
-                                className="w-full max-w-lg bg-[#141414] border border-gray-700 rounded py-3 px-4 text-lg focus:border-[#E50914] outline-none"
-                            />
-                            <button 
-                                onClick={handleImportSearch} 
-                                disabled={loadingStates.importing} 
-                                className="mt-4 bg-[#E50914] px-8 py-3 rounded font-bold flex items-center gap-2 disabled:opacity-50"
-                            >
+                            <input type="text" value={importQuery} onChange={e => setImportQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleImportSearch()} placeholder={t.adminSearchPlaceholder} className="w-full max-w-lg bg-[#141414] border border-gray-700 rounded py-3 px-4 text-lg focus:border-[#E50914] outline-none"/>
+                            <button onClick={handleImportSearch} disabled={loadingStates.importing} className="mt-4 bg-[#E50914] px-8 py-3 rounded font-bold flex items-center gap-2 disabled:opacity-50">
                                 {loadingStates.importing ? <><Loader2 className="animate-spin"/> Searching...</> : <>Search <Search/></>}
                             </button>
                         </div>
@@ -317,21 +290,19 @@ const AdminPanel: React.FC = () => {
                         <div className="flex-1 flex flex-col overflow-hidden">
                            <div className={`grid ${importMode === 'episodes' ? 'grid-cols-2' : 'grid-cols-1'} gap-4 h-full overflow-hidden`}>
                                <div className="p-4 overflow-y-auto custom-scrollbar">
-                                   <h3 className="text-sm text-gray-400 mb-2">Search Results ({importResults.length})</h3>
+                                   <h3 className="text-sm text-gray-400 mb-2">Results ({importResults.length})</h3>
                                     {importResults.map(item => (
                                         <div key={item.jikanId} className="flex gap-3 p-2 bg-[#2a2a2a] rounded mb-2 items-center">
-                                            <img src={item.thumbnail} className="w-12 h-16 object-cover rounded" alt={item.title} />
+                                            <img src={item.thumbnail} className="w-12 h-16 object-cover rounded" alt={item.title}/>
                                             <div className="flex-1 min-w-0">
                                                 <p className="font-bold truncate">{item.title}</p>
                                                 <p className="text-xs text-gray-400">{item.year} - {item.studio}</p>
                                             </div>
-                                            {importMode === 'metadata' && (
-                                                <button onClick={() => handleFillMetadata(item)} className="bg-green-600 text-white px-3 py-1 rounded text-sm font-bold flex items-center gap-1"><Upload size={14}/> Fill Form</button>
-                                            )}
-                                            {importMode === 'episodes' && !importQueue.find(q => q.jikanId === item.jikanId) && (
-                                                <button onClick={() => handleAddToQueue(item)} className="bg-blue-600 text-white px-3 py-1 rounded text-sm font-bold flex items-center gap-1"><ListPlus size={14}/> Add to Queue</button>
-                                            )}
-                                            {importMode === 'episodes' && importQueue.find(q => q.jikanId === item.jikanId) && (
+                                            {importMode === 'metadata' ? (
+                                                <button onClick={() => handleFillMetadata(item)} className="bg-green-600 text-white px-3 py-1 rounded text-sm font-bold flex items-center gap-1"><Upload size={14}/> Fill</button>
+                                            ) : !importQueue.find(q => q.jikanId === item.jikanId) ? (
+                                                <button onClick={() => handleAddToQueue(item)} className="bg-blue-600 text-white px-3 py-1 rounded text-sm font-bold flex items-center gap-1"><ListPlus size={14}/> Add</button>
+                                            ) : (
                                                  <span className="text-green-400 text-sm flex items-center gap-1"><CheckCircle2 size={14}/> Queued</span>
                                             )}
                                         </div>
@@ -346,7 +317,7 @@ const AdminPanel: React.FC = () => {
                                                 <div className="flex-1 min-w-0">
                                                     <p className="font-bold truncate">{item.title}</p>
                                                     <div className="flex items-center gap-2 mt-1">
-                                                        <span className="text-xs text-gray-400">Assign Season:</span>
+                                                        <span className="text-xs text-gray-400">Season:</span>
                                                         <input type="number" value={item.targetSeason} onChange={e => setImportQueue(q => q.map(i => i.jikanId === item.jikanId ? {...i, targetSeason: Number(e.target.value)} : i))} className="w-16 bg-black border border-gray-600 rounded px-2 py-1 text-sm"/>
                                                     </div>
                                                 </div>
@@ -415,8 +386,17 @@ const AdminPanel: React.FC = () => {
                         <div className="grid grid-cols-2 gap-4 text-sm">
                             <input value={animeForm.title || ''} onChange={e => setAnimeForm({...animeForm, title: e.target.value})} placeholder="Title" className="col-span-2 bg-[#141414] border border-gray-700 rounded p-2"/>
                             <textarea value={animeForm.description || ''} onChange={e => setAnimeForm({...animeForm, description: e.target.value})} placeholder="Description" className="col-span-2 bg-[#141414] border border-gray-700 rounded p-2 h-24"/>
-                            <input value={animeForm.thumbnail || ''} onChange={e => setAnimeForm({...animeForm, thumbnail: e.target.value})} placeholder="Thumbnail URL" className="col-span-2 bg-[#141414] border border-gray-700 rounded p-2"/>
-                            <input value={animeForm.heroImage || ''} onChange={e => setAnimeForm({...animeForm, heroImage: e.target.value})} placeholder="Hero Image URL" className="col-span-2 bg-[#141414] border border-gray-700 rounded p-2"/>
+                            
+                            {/* Image URLs */}
+                            <div>
+                                <label className="block text-xs text-gray-500 mb-1 flex items-center gap-1"><ImageIcon size={12}/> Poster URL</label>
+                                <input value={animeForm.thumbnail || ''} onChange={e => setAnimeForm({...animeForm, thumbnail: e.target.value})} placeholder="https://..." className="w-full bg-[#141414] border border-gray-700 rounded p-2"/>
+                            </div>
+                            <div>
+                                <label className="block text-xs text-gray-500 mb-1 flex items-center gap-1"><ImageIcon size={12}/> Hero Image URL</label>
+                                <input value={animeForm.heroImage || ''} onChange={e => setAnimeForm({...animeForm, heroImage: e.target.value})} placeholder="https://... (Wide)" className="w-full bg-[#141414] border border-gray-700 rounded p-2"/>
+                            </div>
+
                             <input value={animeForm.year || ''} type="number" onChange={e => setAnimeForm({...animeForm, year: Number(e.target.value)})} placeholder="Year" className="bg-[#141414] border border-gray-700 rounded p-2"/>
                             <input value={animeForm.ageRating || ''} onChange={e => setAnimeForm({...animeForm, ageRating: e.target.value})} placeholder="Age Rating" className="bg-[#141414] border border-gray-700 rounded p-2"/>
                             <input value={tagInput} onChange={e => setTagInput(e.target.value)} placeholder="Tags (comma separated)" className="col-span-2 bg-[#141414] border border-gray-700 rounded p-2"/>
@@ -453,7 +433,7 @@ const AdminPanel: React.FC = () => {
                                 <div className="space-y-3 text-sm">
                                     <input value={episodeForm.title || ''} onChange={e => setEpisodeForm({...episodeForm, title: e.target.value})} placeholder="Episode Title" className="w-full bg-black border border-gray-700 rounded p-2"/>
                                     
-                                    {/* Video Upload Section */}
+                                    {/* Video Upload */}
                                     <div className="flex gap-2">
                                       <input 
                                           value={episodeForm.videoUrl || ''} 
@@ -469,44 +449,59 @@ const AdminPanel: React.FC = () => {
                                       >
                                           {loadingStates.uploading ? <Loader2 size={18} className="animate-spin"/> : <Upload size={18}/>}
                                       </button>
-                                      <input 
-                                        type="file" 
-                                        ref={fileInputRef} 
-                                        onChange={handleFileUpload} 
-                                        className="hidden" 
-                                        accept="video/mp4,video/webm"
-                                      />
+                                      <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept="video/mp4,video/webm"/>
                                     </div>
 
                                     <input value={episodeForm.thumbnail || ''} onChange={e => setEpisodeForm({...episodeForm, thumbnail: e.target.value})} placeholder="Thumbnail URL" className="w-full bg-black border border-gray-700 rounded p-2"/>
                                     <div className="grid grid-cols-2 gap-2">
-                                      <input value={episodeForm.duration || ''} type="number" onChange={e => setEpisodeForm({...episodeForm, duration: Number(e.target.value)})} placeholder="Duration (s)" className="w-full bg-black border border-gray-700 rounded p-2"/>
-                                      <input value={episodeForm.seasonNumber || ''} type="number" onChange={e => setEpisodeForm({...episodeForm, seasonNumber: Number(e.target.value)})} placeholder="Season No" className="w-full bg-black border border-gray-700 rounded p-2"/>
+                                      <div>
+                                        <label className="text-xs text-gray-500 block mb-1">Season</label>
+                                        <input type="number" value={episodeForm.seasonNumber || 1} onChange={e => setEpisodeForm({...episodeForm, seasonNumber: Number(e.target.value)})} className="w-full bg-black border border-gray-700 rounded p-2"/>
+                                      </div>
+                                      {/* --- DÜZELTİLEN KISIM --- */}
+                                      <div>
+                                        <label className="text-xs text-gray-500 block mb-1">Episode #</label>
+                                        <input 
+                                            type="number" 
+                                            // id yerine episodeNumber'a bağladık
+                                            value={episodeForm.episodeNumber || ''} 
+                                            onChange={e => setEpisodeForm({...episodeForm, episodeNumber: parseInt(e.target.value)})} 
+                                            placeholder="1"
+                                            className="w-full bg-black border border-gray-700 rounded p-2"
+                                        />
+                                      </div>
+                                      {/* ----------------------- */}
                                     </div>
                                 </div>
-                                <button onClick={handleSaveEpisode} disabled={loadingStates.saveEpisode} className="w-full bg-white text-black font-bold py-3 rounded mt-4 flex items-center justify-center gap-2">
+                                <button onClick={handleSaveEpisode} disabled={loadingStates.saveEpisode} className="w-full bg-white text-black font-bold py-3 rounded mt-4 flex items-center justify-center gap-2 hover:bg-gray-200">
                                     {loadingStates.saveEpisode && <Loader2 size={16} className="animate-spin" />}
                                     {editingEpisodeId ? 'Update' : 'Add'} Episode
                                 </button>
-                                {editingEpisodeId && <button onClick={() => { setEditingEpisodeId(null); setEpisodeForm({}); }} className="w-full text-gray-500 mt-2 text-sm">Cancel Edit</button>}
+                                {editingEpisodeId && <button onClick={() => { setEditingEpisodeId(null); setEpisodeForm({}); }} className="w-full text-gray-500 mt-2 text-sm hover:text-white">Cancel Edit</button>}
                             </div>
 
                             {/* --- EPISODE LIST (RIGHT) --- */}
                             <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
                                 {Object.keys(episodesBySeason).length > 0 ? Object.entries(episodesBySeason).map(([season, eps]) => (
-                                    <div key={season}>
-                                        <h4 className="font-bold mb-2 sticky top-0 bg-inherit py-1">Season {season}</h4>
-                                        {(eps as Episode[]).map(ep => (
-                                            <div key={ep.id} className="flex items-center justify-between p-2 bg-[#252525] mb-1 rounded">
-                                                <span className="text-sm truncate flex-1">{ep.id}. {ep.title}</span>
-                                                <div className="flex gap-2">
-                                                    <button onClick={() => { setEpisodeForm(ep); setEditingEpisodeId(ep.id); }} className="text-blue-400 p-1 hover:bg-blue-900/50 rounded"><Pencil size={14} /></button>
-                                                    <button onClick={() => handleDeleteEpisode(ep.id)} disabled={loadingStates.deleteEpisode === ep.id} className="text-red-400 p-1 hover:bg-red-900/50 rounded">
-                                                        {loadingStates.deleteEpisode === ep.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                                                    </button>
+                                    <div key={season} className="mb-6">
+                                        <h4 className="font-bold mb-3 text-gray-400 text-sm uppercase tracking-wider">Season {season}</h4>
+                                        <div className="space-y-1">
+                                            {(eps as Episode[]).map(ep => (
+                                                <div key={ep.id} className="flex items-center justify-between p-3 bg-[#252525] hover:bg-[#2a2a2a] rounded border border-transparent hover:border-gray-600 group">
+                                                    <div className="flex items-center gap-3 overflow-hidden">
+                                                        <span className="text-[#E50914] font-mono text-xs w-6">#{ep.episodeNumber}</span>
+                                                        <span className="text-sm truncate font-medium">{ep.title}</span>
+                                                        {!ep.videoUrl && <span className="text-[10px] bg-red-900/50 text-red-400 px-1 rounded">No Video</span>}
+                                                    </div>
+                                                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button onClick={() => { setEpisodeForm(ep); setEditingEpisodeId(ep.id); }} className="p-1 text-blue-400 hover:bg-blue-900/30 rounded"><Pencil size={14} /></button>
+                                                        <button onClick={() => handleDeleteEpisode(ep.id)} disabled={loadingStates.deleteEpisode === ep.id} className="p-1 text-red-400 hover:bg-red-900/30 rounded">
+                                                            {loadingStates.deleteEpisode === ep.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        ))}
+                                            ))}
+                                        </div>
                                     </div>
                                 )) : <p className="text-gray-500 text-center mt-8">No episodes added yet.</p>}
                             </div>
