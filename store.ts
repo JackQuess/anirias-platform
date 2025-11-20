@@ -6,7 +6,7 @@ import { INITIAL_PROFILES, MOCK_NOTIFICATIONS } from './constants';
 import supabaseClientAny from './services/supabaseClient';
 import { Session, SupabaseClient, AuthChangeEvent } from '@supabase/supabase-js';
 
-// Client'ı güvenli bir şekilde tiple (Implicit any hatasını çözer)
+// Client'ı güvenli bir şekilde tiple
 const supabase = supabaseClientAny as unknown as SupabaseClient | null;
 
 interface AppState {
@@ -92,7 +92,6 @@ export const useAppStore = create<AppState>()(
           memberSince: "2023"
       },
 
-      // --- AUTH ACTIONS ---
       initializeAuth: async () => {
           if (!supabase) {
              console.warn("Supabase client not initialized.");
@@ -129,7 +128,6 @@ export const useAppStore = create<AppState>()(
           set({ currentUser: null, session: null });
       },
 
-      // --- CONTENT ACTIONS (DATA MAPPING) ---
       fetchContent: async () => {
         if (!supabase) {
             set({ isContentLoading: false });
@@ -183,7 +181,7 @@ export const useAppStore = create<AppState>()(
             const newId = (Math.random() * 10000).toFixed(0);
             const newProfile: UserProfile = {
                 id: newId, name, isKid,
-                account_id: 'acc_1', // Mock account ID
+                account_id: 'acc_1',
                 avatar: `https://picsum.photos/seed/${newId}/200`,
                 language: 'Turkish', autoplayNext: true, autoplayPreviews: true
             };
@@ -269,7 +267,6 @@ export const useAppStore = create<AppState>()(
       addAnime: async (animeData) => {
         if (!supabase) throw new Error("Supabase client not available");
         
-        // Frontend -> DB Mapping
         const dbPayload = {
             title: animeData.title,
             description: animeData.description,
@@ -299,12 +296,10 @@ export const useAppStore = create<AppState>()(
         if (!supabase) throw new Error("Supabase client not available");
         
         const dbPayload: any = { ...updatedAnime };
-        // Map fields
         if (updatedAnime.heroImage) dbPayload.hero_image = updatedAnime.heroImage;
         if (updatedAnime.ageRating) dbPayload.age_rating = updatedAnime.ageRating;
         if (updatedAnime.jikanId) dbPayload.jikan_id = updatedAnime.jikanId;
         
-        // Cleanup frontend fields
         delete dbPayload.heroImage;
         delete dbPayload.ageRating;
         delete dbPayload.jikanId;
@@ -330,14 +325,17 @@ export const useAppStore = create<AppState>()(
         const episodesInput = Array.isArray(episodeData) ? episodeData : [episodeData];
         
         const dbPayloads = episodesInput.map(ep => {
-            // DÜZELTME: 'rest' değişkeni kaldırıldı ve sadece gerekli veriler eşlendi.
-            // Ayrıca episode_number, backend'de zorunlu olduğu için eklendi.
+            // Geçici ID'yi yoksay
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { id, ...rest } = ep;
+
             return {
                 anime_id: animeId,
                 title: ep.title,
                 thumbnail_url: ep.thumbnail,
                 video_url: ep.videoUrl,
                 season_number: ep.seasonNumber || 1,
+                // DÜZELTME: episodeNumber zorunlu olduğu için rasgele sayı atıyoruz
                 episode_number: ep.episodeNumber || (Math.floor(Math.random() * 10000)), 
                 intro_start: ep.introStart,
                 intro_end: ep.introEnd,
