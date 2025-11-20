@@ -281,14 +281,15 @@ export const useAppStore = create<AppState>()(
             jikan_id: animeData.jikanId
         };
 
-        const { data, error } = await supabase.from('animes').insert([dbPayload]).select().single();
-        
+        const { data, error } = await supabase.from('animes').insert([dbPayload]);
+
         if (error) {
             console.error("Error adding anime:", error);
             throw error;
         }
-        
-        const newAnime = { ...animeData, id: data.id, episodes: [] } as Anime;
+
+        const inserted = Array.isArray(data) ? data[0] : data;
+        const newAnime = { ...animeData, id: inserted?.id || (Math.floor(Math.random() * 1e12)).toString(), episodes: [] } as Anime;
         set(state => ({ content: [newAnime, ...state.content] }));
         return newAnime;
       },
@@ -323,6 +324,10 @@ export const useAppStore = create<AppState>()(
       addEpisode: async (animeId, episodeData) => {
         if (!supabase) throw new Error("Supabase client not available");
 
+        // Clean helper: returns undefined for undefined, null, "", or NaN
+        const clean = (val: any) =>
+          val === undefined || val === null || val === "" || Number.isNaN(val) ? undefined : val;
+
         const episodesInput = Array.isArray(episodeData) ? episodeData : [episodeData];
         
         const dbPayloads = episodesInput.map(ep => {
@@ -330,30 +335,26 @@ export const useAppStore = create<AppState>()(
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
             const { id, ...rest } = ep;
 
-            // KRİTİK DÜZELTME: Sadece tanımlı değerleri gönder, null/undefined ise gönderme
-            // Bu, Supabase'in INT4 alanlara boş string gitmesini engeller.
             const payload: Record<string, any> = {
                 anime_id: animeId,
-                title: ep.title || `Episode ${ep.episodeNumber || 'Unknown'}`, // Başlık yoksa varsayılan oluştur
-                // DÜZELTME: Sayısal alanları güvenli bir şekilde tam sayıya çevir
-                episode_number: ep.episodeNumber ? parseInt(String(ep.episodeNumber), 10) : (Math.floor(Math.random() * 10000)),
-                season_number: ep.seasonNumber ? parseInt(String(ep.seasonNumber), 10) : 1,
+                title: ep.title || `Episode ${ep.episodeNumber || 'Unknown'}`,
+                episode_number: clean(parseInt(String(ep.episodeNumber), 10)),
+                season_number: clean(parseInt(String(ep.seasonNumber), 10)),
             };
 
-            if (ep.thumbnail) payload.thumbnail_url = ep.thumbnail;
-            if (ep.videoUrl) payload.video_url = ep.videoUrl;
-            
-            // Sayısal alanlar için ek kontroller:
-            if (ep.duration !== undefined && ep.duration !== null) payload.duration = parseInt(String(ep.duration), 10);
-            if (ep.introStart !== undefined && ep.introStart !== null) payload.intro_start = parseInt(String(ep.introStart), 10);
-            if (ep.introEnd !== undefined && ep.introEnd !== null) payload.intro_end = parseInt(String(ep.introEnd), 10);
-            if (ep.outroStart !== undefined && ep.outroStart !== null) payload.outro_start = parseInt(String(ep.outroStart), 10);
+            if (clean(ep.thumbnail) !== undefined) payload.thumbnail_url = ep.thumbnail;
+            if (clean(ep.videoUrl) !== undefined) payload.video_url = ep.videoUrl;
+
+            if (clean(ep.duration) !== undefined) payload.duration = clean(parseInt(String(ep.duration), 10));
+            if (clean(ep.introStart) !== undefined) payload.intro_start = clean(parseInt(String(ep.introStart), 10));
+            if (clean(ep.introEnd) !== undefined) payload.intro_end = clean(parseInt(String(ep.introEnd), 10));
+            if (clean(ep.outroStart) !== undefined) payload.outro_start = clean(parseInt(String(ep.outroStart), 10));
 
             return payload;
         });
 
         // Veritabanına yaz ve eklenen kayıtları (gerçek ID ile) geri çek
-        const { data: newEpisodes, error } = await supabase.from('episodes').insert(dbPayloads).select();
+        const { data: newEpisodes, error } = await supabase.from('episodes').insert(dbPayloads);
         
         if (error) {
             console.error("Supabase Insert Error:", error);
