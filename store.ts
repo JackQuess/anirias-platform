@@ -102,11 +102,37 @@ export const useAppStore = create<AppState>()(
           
           const { data: { session } } = await supabase.auth.getSession();
           set({ session, isAuthLoading: false });
+          if (session?.user) {
+              const { data: acc, error: accErr } = await supabase
+                  .from("accounts")
+                  .select("*")
+                  .eq("id", session.user.id)
+                  .single();
+
+              if (!accErr && acc) {
+                  set({ account: acc as AccountDetails });
+              }
+          }
 
           supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
               set({ session });
               if (!session) {
                   set({ currentUser: null });
+              }
+              if (session?.user) {
+                  (async () => {
+                      const { data: acc, error: accErr } = await supabase
+                          .from("accounts")
+                          .select("*")
+                          .eq("id", session.user.id)
+                          .single();
+
+                      if (!accErr && acc) {
+                          set({ account: acc as AccountDetails });
+                      }
+                  })();
+              } else {
+                  set({ account: {} as AccountDetails });
               }
           });
       },
@@ -126,7 +152,7 @@ export const useAppStore = create<AppState>()(
       signOut: async () => {
           if (!supabase) return;
           await supabase.auth.signOut();
-          set({ currentUser: null, session: null });
+          // Auth state listener in initializeAuth will clear session & currentUser
       },
 
       // --- CONTENT ACTIONS (DATA MAPPING) ---

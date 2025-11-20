@@ -77,8 +77,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, currentView, onNavigate
   ];
 
   const handleSignOut = () => {
-      signOut(); // Call Supabase SignOut
-      window.location.reload();
+      signOut(); // Supabase logout will trigger auth listener and clear state
   };
 
   return (
@@ -132,9 +131,11 @@ const Layout: React.FC<LayoutProps> = ({ children, user, currentView, onNavigate
                         <div onClick={() => { onNavigate('account'); setShowMobileMenu(false); }} className="flex items-center gap-4 px-4 py-3 rounded-lg text-gray-300 hover:bg-[#1f1f1f] hover:text-white">
                             <Globe size={20} /> {t.account}
                         </div>
-                         <div onClick={() => { onNavigate('admin'); setShowMobileMenu(false); }} className="flex items-center gap-4 px-4 py-3 rounded-lg text-gray-300 hover:bg-[#1f1f1f] hover:text-white">
-                            <ShieldCheck size={20} className="text-[#E50914]" /> {t.adminPanel}
-                        </div>
+                        {account.role === 'admin' && (
+                            <div onClick={() => { onNavigate('admin'); setShowMobileMenu(false); }} className="flex items-center gap-4 px-4 py-3 rounded-lg text-gray-300 hover:bg-[#1f1f1f] hover:text-white">
+                                <ShieldCheck size={20} className="text-[#E50914]" /> {t.adminPanel}
+                            </div>
+                        )}
                     </div>
                     
                     <div className="mt-6 pt-6 border-t border-gray-800">
@@ -283,12 +284,14 @@ const Layout: React.FC<LayoutProps> = ({ children, user, currentView, onNavigate
                         <Globe size={16} /> {t.account}
                     </div>
                     
-                    <div 
-                        className="text-sm text-gray-300 px-4 py-2 hover:bg-white/10 rounded flex items-center gap-3 transition"
-                        onClick={() => onNavigate('admin')}
-                    >
-                        <ShieldCheck size={16} className="text-[#E50914]" /> {t.adminPanel}
-                    </div>
+                    {account.role === 'admin' && (
+                        <div 
+                            className="text-sm text-gray-300 px-4 py-2 hover:bg-white/10 rounded flex items-center gap-3 transition"
+                            onClick={() => onNavigate('admin')}
+                        >
+                            <ShieldCheck size={16} className="text-[#E50914]" /> {t.adminPanel}
+                        </div>
+                    )}
 
                      <div 
                         className="text-sm text-gray-300 px-4 py-2 hover:bg-white/10 rounded flex items-center gap-3 transition"
