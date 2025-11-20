@@ -4,8 +4,11 @@ const JIKAN_API_URL = 'https://api.jikan.moe/v4';
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+// Helper: Güvenli bir şekilde değeri tam sayıya çevirir, geçersizse undefined döndürür.
+const safeInt = (val: any) => (val === null || val === undefined || isNaN(parseInt(val))) ? undefined : parseInt(val);
+
 // Robust fetch with exponential backoff
-const fetchWithRetry = async (url: string, retries = 3, backoff = 500): Promise<any> => {
+const fetchWithRetry = async (url: string, retries = 5, backoff = 1000): Promise<any> => { // Artırılmış deneme sayısı ve bekleme süresi
     try {
         const response = await fetch(url);
         
@@ -15,13 +18,13 @@ const fetchWithRetry = async (url: string, retries = 3, backoff = 500): Promise<
                 await delay(backoff);
                 return fetchWithRetry(url, retries - 1, backoff * 2);
             } else {
-                throw new Error('API Rate Limit Exceeded. Please wait a moment.');
+                throw new Error('API Rate Limit Exceeded. Max retries reached.');
             }
         }
 
         if (!response.ok) {
             if(response.status === 404) return null;
-            throw new Error(`API Error: ${response.status}`);
+            throw new Error(`API Error: ${response.status} - ${await response.text()}`);
         }
 
         return await response.json();
@@ -30,7 +33,7 @@ const fetchWithRetry = async (url: string, retries = 3, backoff = 500): Promise<
             await delay(backoff);
             return fetchWithRetry(url, retries - 1, backoff * 2);
         }
-        console.error("Fetch failed:", error);
+        console.error("Fetch failed after all retries:", error);
         return null;
     }
 };
@@ -100,23 +103,24 @@ export const fetchEpisodesFromJikan = async (
     let hasNextPage = true;
 
     try {
-        while (hasNextPage && page <= 5) { // Limit pages
+        while (hasNextPage && page <= 5) {
             onStatus(`Fetching Page ${page}...`);
             const data = await fetchWithRetry(`${JIKAN_API_URL}/anime/${malId}/episodes?page=${page}`);
             
             if (data && data.data) {
                 const mapped = data.data.map((ep: any) => ({
-                    // KRİTİK: id alanı YOK. Supabase otomatik atar.
                     title: ep.title || `Episode ${ep.mal_id}`,
-                    duration: 1440, // Varsayılan süre
+                    // Süre int4 olduğu için güvenli int kullanıyoruz
+                    duration: safeInt(ep.duration) || undefined, 
                     thumbnail: defaultImage,
-                    introStart: undefined,
-                    introEnd: undefined,
-                    outroStart: undefined,
+                    // Sayısal alanlar artık null/undefined olabilir, bu da Supabase int'e boş değer göndermeyi dener.
+                    introStart: safeInt(ep.introStart),
+                    introEnd: safeInt(ep.introEnd),
+                    outroStart: safeInt(ep.outroStart),
                     releaseDate: ep.aired ? new Date(ep.aired).toISOString().split('T')[0] : undefined,
                     seasonNumber: seasonNum,
                     videoUrl: '', 
-                    episodeNumber: ep.mal_id, // MAL ID'yi bölüm numarası olarak sakla
+                    episodeNumber: safeInt(ep.mal_id), 
                 }));
                 allEpisodes = [...allEpisodes, ...mapped];
             }
