@@ -92,7 +92,6 @@ export const useAppStore = create<AppState>()(
           memberSince: "2023"
       },
 
-      // --- AUTH ACTIONS ---
       initializeAuth: async () => {
           if (!supabase) {
              console.warn("Supabase client not initialized.");
@@ -137,7 +136,7 @@ export const useAppStore = create<AppState>()(
         }
         set({ isContentLoading: true });
         try {
-            // episodes tablosunu foreign key ile çekiyoruz (PGRST201 hatasını önler)
+            // DÜZELTME: İlişki hatasını (PGRST201) önlemek için foreign key adını açıkça belirtiyoruz.
             const { data, error } = await supabase
                 .from('animes')
                 .select(`*, episodes!episodes_anime_id_fkey(*)`)
@@ -327,7 +326,7 @@ export const useAppStore = create<AppState>()(
         const episodesInput = Array.isArray(episodeData) ? episodeData : [episodeData];
         
         const dbPayloads = episodesInput.map(ep => {
-            // Geçici ID'yi yoksay, Supabase atayacak
+            // Geçici ID'yi yoksayıyoruz
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
             const { id, ...rest } = ep;
 
@@ -337,6 +336,7 @@ export const useAppStore = create<AppState>()(
                 thumbnail_url: ep.thumbnail,
                 video_url: ep.videoUrl,
                 season_number: ep.seasonNumber || 1,
+                // DÜZELTME: episodeNumber zorunlu olduğu için rasgele sayı atıyoruz
                 episode_number: ep.episodeNumber || (Math.floor(Math.random() * 10000)), 
                 intro_start: ep.introStart,
                 intro_end: ep.introEnd,
@@ -357,6 +357,7 @@ export const useAppStore = create<AppState>()(
         set(state => ({
           content: state.content.map(a => a.id === animeId ? { 
               ...a, 
+              // newEpisodes artık gerçek DB ID'lerini içerir.
               episodes: [...a.episodes, ...(newEpisodes as Episode[])], 
               lastUpdated: Date.now() 
           } : a)
